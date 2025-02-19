@@ -33,3 +33,8 @@ def home():
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unexpected Error: {str(exc)}", exc_info=True)
     return {"error": "Internal Server Error"}
+
+# Uvicorn command for running the deployed code
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
