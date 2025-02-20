@@ -1,4 +1,5 @@
 import os
+import pandas as pd
 import pdfplumber
 import pytesseract
 from PIL import Image
@@ -9,11 +10,12 @@ from services.vectorstore import vector_db
 from langchain_openai import OpenAIEmbeddings
 from config.config import OPENAI_EMBEDDING_MODEL, UPLOAD_DIR
 
+# Initialize embedding model
 embedding_model = OpenAIEmbeddings(model=OPENAI_EMBEDDING_MODEL)
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 def process_uploaded_files(files: list[UploadFile]):
-    """Processes uploaded files and prepares them for ChromaDB indexing with correct format."""
+    """Processes uploaded PDFs, images, text files, and CSV/Excel into ChromaDB."""
     texts = []
     metadatas = []
     splitter = RecursiveCharacterTextSplitter(chunk_size=512, chunk_overlap=50)
@@ -24,14 +26,28 @@ def process_uploaded_files(files: list[UploadFile]):
             buffer.write(file.file.read())
 
         extracted_text = ""
-        if file.filename.endswith(".pdf"):
+
+        # Extract Text from CSV
+        if file.filename.endswith(".csv"):
+            df = pd.read_csv(file_path)
+            extracted_text = df.to_string(index=False)
+
+        # Extract Text from Excel
+        elif file.filename.endswith((".xls", ".xlsx")):
+            df = pd.read_excel(file_path)
+            extracted_text = df.to_string(index=False)
+
+        # Extract Text from PDFs
+        elif file.filename.endswith(".pdf"):
             with pdfplumber.open(file_path) as pdf:
                 extracted_text = "\n".join([p.extract_text() for p in pdf.pages if p.extract_text()])
 
+        # Extract Text from Images using OCR
         elif file.filename.endswith((".png", ".jpg", ".jpeg")):
             img = Image.open(file_path)
             extracted_text = pytesseract.image_to_string(img).strip()
 
+        # Extract Text from Text Files
         elif file.filename.endswith((".txt", ".md")):
             loader = TextLoader(file_path)
             text_docs = loader.load()
@@ -40,13 +56,13 @@ def process_uploaded_files(files: list[UploadFile]):
         if not extracted_text.strip():
             continue
 
+        # Split text for efficient indexing
         chunks = splitter.split_text(extracted_text)
         texts.extend(chunks)
-        metadatas.extend([{"source": file.filename}] * len(chunks))  # ✅ Consistent metadata
+        metadatas.extend([{"source": file.filename}] * len(chunks))
 
     if texts and metadatas:
         try:
-            # Correct usage: separate texts and metadatas
             vector_db.add_texts(texts=texts, metadatas=metadatas)
             return {"message": f"Indexed {len(texts)} document chunks successfully!"}
         except Exception as e:
