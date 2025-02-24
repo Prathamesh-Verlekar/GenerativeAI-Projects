@@ -20,7 +20,7 @@ def process_uploaded_files(files: list[UploadFile], session_id: str):
     with embeddings and session-based metadata.
     """
     texts = []
-    splitter = RecursiveCharacterTextSplitter(chunk_size=512, chunk_overlap=50)
+    splitter = RecursiveCharacterTextSplitter(chunk_size=5000, chunk_overlap=100)
 
     for file in files:
         file_path = os.path.join(UPLOAD_DIR, file.filename)
@@ -53,7 +53,7 @@ def process_uploaded_files(files: list[UploadFile], session_id: str):
                 extracted_text = "\n".join([doc.page_content for doc in text_docs])
 
             if not extracted_text.strip():
-                logger.warning(f"⚠️ No valid text extracted from {file.filename}")
+                logger.warning(f"No valid text extracted from {file.filename}")
                 continue
 
             # Split and Embed Text
