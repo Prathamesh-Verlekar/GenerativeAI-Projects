@@ -4,11 +4,10 @@ from langchain_community.vectorstores.pinecone import Pinecone as LangchainPinec
 from langchain_openai import OpenAIEmbeddings
 from config.config import PINECONE_API_KEY, PINECONE_CHAT_INDEX, PINECONE_VECTOR_INDEX, OPENAI_EMBEDDING_MODEL
 
-PINECONE_API_KEY = os.getenv("PINECONE_API_KEY", "pcsk_7G2DdN_45TSx2hNKK7p8Xi1uFkNKrNsMfp8QjLLqRZfdNQLh8Varv8kpPRo9EJvoeVM1Jw")
 PINECONE_ENVIRONMENT = os.getenv("PINECONE_ENVIRONMENT", "gcp-starter")
 
 # Initialize Pinecone client
-pc = Pinecone(api_key=PINECONE_API_KEY)
+pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 
 # Index for chat history
 if PINECONE_CHAT_INDEX not in pc.list_indexes().names():
