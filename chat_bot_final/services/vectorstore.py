@@ -2,7 +2,7 @@ import os
 from pinecone import Pinecone, ServerlessSpec
 from langchain_community.vectorstores.pinecone import Pinecone as LangchainPinecone
 from langchain_openai import OpenAIEmbeddings
-from config.config import PINECONE_API_KEY, PINECONE_CHAT_INDEX, PINECONE_VECTOR_INDEX, OPENAI_EMBEDDING_MODEL
+from config.config import PINECONE_CHAT_INDEX, PINECONE_VECTOR_INDEX, OPENAI_EMBEDDING_MODEL
 
 PINECONE_ENVIRONMENT = os.getenv("PINECONE_ENVIRONMENT", "gcp-starter")
 
