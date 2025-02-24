@@ -120,7 +120,6 @@ pdfplumber==0.11.5
 pillow==11.0.0
 pinecone==6.0.1
 pinecone-client==5.0.1
-pinecone-plugin-inference==1.1.0
 pinecone-plugin-interface==0.0.7
 posthog==3.11.0
 propcache==0.2.1
