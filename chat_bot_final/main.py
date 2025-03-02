@@ -3,6 +3,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from routes import chat, index, history, session
 from config.config import SESSION_SECRET_KEY
 from config.logging_config import logger
+import os
 
 app = FastAPI(title="Session-Based Chatbot with Pinecone")
 
