@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Request
 from starlette.middleware.sessions import SessionMiddleware
-from routes import chat, index, history 
+from routes import chat, index, history, session
 from config.config import SESSION_SECRET_KEY
 from config.logging_config import logger
 
@@ -20,6 +20,7 @@ async def log_requests(request: Request, call_next):
 app.include_router(chat.router)
 app.include_router(index.router)
 app.include_router(history.router)
+app.include_router(session.router)
 
 @app.get("/")
 def home(request: Request):

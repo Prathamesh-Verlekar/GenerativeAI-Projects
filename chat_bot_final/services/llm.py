@@ -2,19 +2,20 @@ from openai import OpenAI
 from langchain.chains import ConversationalRetrievalChain
 from langchain_community.chat_models import ChatOpenAI
 from langchain.memory import ConversationBufferMemory
-from services.vectorstore import retriever, chat_index
+from services.vectorstore import retriever, chat_index, chunk_index
 from datetime import datetime
 from services.vectorstore import retriever, embedding_model 
 from utils.prompts import prompt as default_prompt
 from config.config import OPENAI_MODEL_NAME
 from config.logging_config import logger
 from sklearn.metrics.pairwise import cosine_similarity
+import logging
 import numpy as np
 import time
 import os
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-llm = ChatOpenAI(model=OPENAI_MODEL_NAME, temperature=0.7, max_tokens=250)
+llm = ChatOpenAI(model=OPENAI_MODEL_NAME, temperature=0.7, max_tokens=500)
 
 memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True, k=4)
 
@@ -22,19 +23,19 @@ qa_chain = ConversationalRetrievalChain.from_llm(llm=llm, retriever=retriever, m
 
 # Store Chat History in Pinecone
 def store_chat(session_id: str, question: str, answer: str):
-    """Store chat history with embeddings in Pinecone."""
+    """Store chat history with embeddings in Pinecone, ensuring correct session ID association."""
     embedding = embedding_model.embed_query(f"User: {question}\nAssistant: {answer}")
     pinecone_id = f"{session_id}_{datetime.utcnow().isoformat()}"
     chat_index.upsert(
-        vectors=[(
-            pinecone_id,
-            embedding,
-            {
+        vectors=[{
+            "id": pinecone_id,
+            "values": embedding,
+            "metadata": {
                 "session_id": session_id,
-                "question": question, 
+                "question": question,
                 "answer": answer       
             }
-        )]
+        }]
     )
 
 # Determine relevance of first question with second
@@ -47,19 +48,37 @@ def is_relevant(current_query_embedding, history_embeddings, threshold=0.7):
     logger.info(f"Max similarity score with history: {max_similarity}")
     return max_similarity >= threshold
 
-def retrieve_history(session_id: str, query: str = "", top_k: int = 10):
-    """Retrieve chat history for a given session from Pinecone."""
+def retrieve_history(session_id: str, top_k: int = 4):
+    """Retrieve last 4 chat history messages for a given session from Pinecone."""
+    logging.info(f"Querying Pinecone for chat history of session_id: {session_id}")
     results = chat_index.query(
-        vector=embedding_model.embed_query(query),
+        vector=[0] * 1536,
         top_k=top_k,
         include_metadata=True,
         filter={"session_id": {"$eq": session_id}}
     )
+    if not results.get("matches"):
+        logging.warning(f"No chat history found in Pinecone for session_id: {session_id}")
+        return []
     return [
-        {"question": r.get("metadata", {}).get("question", ""), 
-         "answer": r.get("metadata", {}).get("answer", "")}
-        for r in results.get("matches", [])
+        {"question": r["metadata"].get("question", ""), "answer": r["metadata"].get("answer", "")}
+        for r in results.get("matches", []) if "metadata" in r
     ]
+
+def retrieve_relevant_chunks(session_id: str, query: str, top_k: int = 5):
+    """Retrieve relevant document chunks from Pinecone based on query similarity."""
+    logging.info(f"Searching for relevant chunks for session_id: {session_id}")
+    query_embedding = embedding_model.embed_query(query)
+    results = chunk_index.query(
+        vector=query_embedding,
+        top_k=top_k,
+        include_metadata=True,
+        filter={"session_id": {"$eq": session_id}}
+    )
+    if not results.get("matches"):
+        logging.warning(f"No matching documents found in Pinecone for session_id: {session_id}")
+        return []
+    return [{"content": r["metadata"].get("content", "")} for r in results.get("matches", []) if "metadata" in r]
 
 
 def generate_answer(query: str, session_id: str):
@@ -67,8 +86,10 @@ def generate_answer(query: str, session_id: str):
     logger.info(f"New Question Received: {query}")
 
     try:
+        relevant_chunks = retrieve_relevant_chunks(session_id, query)
+        context = "\n".join([chunk["content"] for chunk in relevant_chunks]) if relevant_chunks else "No relevant context found."
         # Retrieve session history
-        history = retrieve_history(session_id, query)
+        history = retrieve_history(session_id)
         history_texts = [f"User: {h['question']}\nAssistant: {h['answer']}" for h in history]
 
         # Embed current query
@@ -77,28 +98,14 @@ def generate_answer(query: str, session_id: str):
 
         # Check relevance
         relevant = is_relevant(current_query_embedding, history_embeddings)
-        context = "\n".join([f"User: {h['question']}\nAssistant: {h['answer']}" for h in history]) if relevant else ""
+        history_context = "\n".join([f"User: {h['question']}\nAssistant: {h['answer']}" for h in history]) if relevant else ""
         if not relevant:
             logger.info("No relevant history found. Proceeding without history context.")
 
-        # Custom Prompt
-        # prompt = f"""
-        # You are an intelligent AI assistant. Provide detailed, relevant, and helpful responses based on the context below.
-        # If the context does not provide sufficient information, rely on general knowledge to answer the query.
-        # If you truly have no knowledge of the answer, respond with: "I'm not sure about that."
-
-        # Context:
-        # {context}
-
-        # Question:
-        # {query}
-
-        # Answer:
-        # """
-
         # Generate response using Conversational RAG (Updated with 'invoke()' and prompt)
         start_time = time.time()
-        final_prompt = default_prompt.format(context=context, query=query)
+        full_context = f"Relevant Documents:\n{context}\n\nChat History:\n{history_context}"
+        final_prompt = default_prompt.format(context=full_context, query=query)
         # Conditionally generate the answer:
         if relevant:
             # Use qa_chain when history is relevant

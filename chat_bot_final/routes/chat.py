@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Query
 from fastapi import HTTPException
 from schemas.chat_schemas import ChatRequest, ChatResponse
 from services.llm import generate_answer
@@ -7,9 +7,9 @@ import os
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
 @router.post("/", response_model=ChatResponse)
-async def chat_with_bot(request: Request, chat_request: ChatRequest):
+async def chat_with_bot(request: Request, chat_request: ChatRequest, session_id: str = Query(None)):
     """Chat endpoint that handles user query and manages session context."""
-    session_id = request.session.get("session_id")
+    session_id = session_id or request.session.get("session_id")
     if not session_id:
         session_id = os.urandom(24).hex()
         request.session["session_id"] = session_id
