@@ -1,0 +1,18 @@
+[project]
+name = "financial-advisor-agent"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+  "pydantic-settings>=2.0.0",
+  "requests>=2.31.0",
+  "redis>=5.0.0",
+
+  # MCP SDK package name may vary in your environment
+  "mcp",
+
+  # ADK + LiteLLM integration (LiteLLM enables OpenAI models in ADK)
+  "litellm>=1.0.0",
+  # Add your ADK package here (name/version depends on how you installed it)
+  # "google-adk>=X.Y.Z",
+]
+
