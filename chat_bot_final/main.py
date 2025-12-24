@@ -1,6 +1,10 @@
 from fastapi import FastAPI, Request
 from starlette.middleware.sessions import SessionMiddleware
+<<<<<<< HEAD
 from routes import chat, index, history, session
+=======
+from routes import chat, index, history, session 
+>>>>>>> e22de01 (Session backend)
 from config.config import SESSION_SECRET_KEY
 from config.logging_config import logger
 import os

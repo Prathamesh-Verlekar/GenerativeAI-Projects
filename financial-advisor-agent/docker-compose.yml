@@ -1,0 +1,22 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  alpha-mcp:
+    build:
+      context: .
+      dockerfile: mcp_servers/alpha_vantage_mcp/Dockerfile
+    env_file:
+      - .env
+    environment:
+      ALPHAVANTAGE_API_KEY: ${ALPHAVANTAGE_API_KEY}
+      REDIS_URL: ${REDIS_URL}
+      QUOTE_CACHE_TTL_SEC: ${QUOTE_CACHE_TTL_SEC}
+      MAX_HISTORY_DAYS: ${MAX_HISTORY_DAYS}
+    ports:
+      - "8787:8787"
+    depends_on:
+      - redis
+
