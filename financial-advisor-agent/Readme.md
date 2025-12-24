@@ -58,29 +58,6 @@ This project demonstrates **production-grade agent architecture** with:
 
 ---
 
-## 🏗️ High-Level Architecture
-
-```mermaid
-flowchart LR
-    User -->|Chat| StreamlitUI
-    StreamlitUI -->|User Message| ADKRunner
-    ADKRunner -->|Prompt| LLM[OpenAI GPT via LiteLLM]
-
-    LLM -->|Tool Decision| McpToolset
-    McpToolset -->|SSE| MCPServer
-
-    MCPServer -->|Cache Lookup| Redis
-    MCPServer -->|API Call (if miss)| AlphaVantage
-
-    AlphaVantage --> MCPServer
-    Redis --> MCPServer
-
-    MCPServer -->|Tool Result| LLM
-    LLM -->|Final Answer| StreamlitUI
-```
-
----
-
 ## 📂 Repository Structure
 
 ```text
