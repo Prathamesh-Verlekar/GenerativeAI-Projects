@@ -1,22 +1,24 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from __future__ import annotations
+
+from pydantic import BaseModel
+import os
 
 
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+class Settings(BaseModel):
+    # LLM
+    OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "openai/gpt-4.1-mini")
 
-    # LiteLLM model string, e.g. "openai/gpt-4.1-mini"
-    OPENAI_MODEL: str = "openai/gpt-4.1-mini"
+    # MCP endpoints (SSE)
+    MCP_ALPHA_URL: str = os.getenv("MCP_ALPHA_URL", "http://localhost:8787/sse")
+    MCP_SHEETS_URL: str = os.getenv("MCP_SHEETS_URL", "http://localhost:8790/sse")
 
-    # MCP endpoint for Alpha Vantage tools
-    MCP_ALPHA_URL: str = "http://localhost:8787/sse"
-    MCP_SHEETS_URL: str = "http://localhost:8790/sse"
+    # Optional: if your Sheets MCP server reads default spreadsheet ID from env,
+    # your app doesn’t need this. Keep it here if you want app-side routing.
+    GOOGLE_SHEETS_DEFAULT_RANGE: str = os.getenv("GOOGLE_SHEETS_DEFAULT_RANGE","Sheet1!A1:Z200")
 
-    # Default spreadsheet to use when the caller does not provide one explicitly
-    GOOGLE_SHEETS_SPREADSHEET_ID: str = ""
-
-    QUOTE_CACHE_TTL_SEC: int = 20
-    MAX_HISTORY_DAYS: int = 3650
-    REQUESTS_PER_MIN_PER_USER: int = 30
+    # Context limits
+    SHEETS_CONTEXT_MAX_ROWS: int = int(os.getenv("SHEETS_CONTEXT_MAX_ROWS", "60"))
+    SHEETS_CONTEXT_MAX_CHARS: int = int(os.getenv("SHEETS_CONTEXT_MAX_CHARS", "12000"))
 
 
 settings = Settings()

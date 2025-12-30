@@ -7,20 +7,30 @@ from app.financial_advisor.config import settings
 from app.financial_advisor.tools.mcp_alpha_vantage import build_alpha_toolset
 from app.financial_advisor.tools.mcp_google_sheets import build_google_sheets_toolset
 
-# If you already load system.md, keep that logic.
-INSTRUCTION = """You are a cautious financial advisor assistant.
-- Use tools for market data (quotes/history).
-- Do not claim certainty or guarantee returns.
-- Ask for missing context (time horizon, risk tolerance) before giving suggestions.
-"""
+
+def _load_system_prompt() -> str:
+    # If you package system.md differently, adjust path accordingly.
+    # Keeping it simple: read from app/financial_advisor/prompts/system.md
+    import pathlib
+    p = pathlib.Path(__file__).resolve().parent / "prompts" / "system.md"
+    try:
+        return p.read_text(encoding="utf-8")
+    except Exception:
+        # Fallback minimal instruction
+        return (
+            "You are a cautious financial advisor assistant. Use tools for prices/history; "
+            "do not guarantee returns; ask for missing context."
+        )
+
 
 def build_model() -> LiteLlm:
-    # Example: settings.OPENAI_MODEL = "openai/gpt-4.1-mini"
     return LiteLlm(model=settings.OPENAI_MODEL, temperature=0.2)
+
 
 agent = LlmAgent(
     name="financial_advisor",
     model=build_model(),
-    instruction=INSTRUCTION,
+    instruction=_load_system_prompt(),
     tools=[build_alpha_toolset(), build_google_sheets_toolset()],
 )
+

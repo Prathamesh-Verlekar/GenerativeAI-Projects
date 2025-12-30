@@ -10,6 +10,7 @@ from google.genai import types
 from app.financial_advisor.agent import agent
 from app.financial_advisor.guardrails.input_validation import normalize_user_text, looks_like_prompt_injection
 from app.financial_advisor.guardrails.output_validation import validate_financial_output
+from app.financial_advisor.tools.sheets_context import fetch_sheet_context, needs_sheet_context
 
 APP_NAME = "financial-advisor-agent"
 USER_ID = "local-user"
@@ -22,7 +23,6 @@ def extract_ticker_from_text(text: str) -> Optional[str]:
     m = re.search(r"\bticker(?:\s+code)?\s*[:is-]+\s*([A-Z]{1,7})\b", text, re.IGNORECASE)
     if m:
         return m.group(1).upper()
-    # fallback: $CRWV pattern
     m2 = re.search(r"\$([A-Z]{1,7})\b", text)
     if m2:
         return m2.group(1).upper()
@@ -40,11 +40,9 @@ def rewrite_followup(user_text: str, last_ticker: Optional[str]) -> str:
 
     t = (user_text or "").strip().lower()
 
-    # Price follow-ups
     if any(p in t for p in ["its price", "what is its price", "price?", "current price", "how much is it"]) and not user_mentions_ticker(user_text):
         return f"Get the latest quote for {last_ticker} and answer with price, change %, and as_of timestamp."
 
-    # Yesterday follow-ups
     if "yesterday" in t and not user_mentions_ticker(user_text):
         return (
             f"For {last_ticker}: use get_history(symbol='{last_ticker}', days=5) and answer:\n"
@@ -63,6 +61,11 @@ async def run_once(runner: Runner, session_id: str, user_text: str) -> str:
             "I can’t follow requests that try to override system rules or reveal secrets. "
             "Tell me your investing question (symbol, goal, time horizon), and I’ll help."
         )
+
+    # ✅ Deterministic spreadsheet grounding (when relevant)
+    if needs_sheet_context(user_text):
+        sheet_ctx = await fetch_sheet_context()
+        user_text = f"{sheet_ctx}\nUser question:\n{user_text}"
 
     content = types.Content(role="user", parts=[types.Part(text=user_text)])
 
@@ -87,7 +90,6 @@ async def main():
     runner = Runner(agent=agent, app_name=APP_NAME, session_service=session_service)
 
     last_ticker: Optional[str] = None
-
     print("Financial Advisor Agent is running. Type 'exit' to quit.")
 
     while True:
@@ -95,12 +97,9 @@ async def main():
         if user.lower() in {"exit", "quit"}:
             break
 
-        # Rewrite follow-ups with memory
         user2 = rewrite_followup(user, last_ticker)
-
         answer = await run_once(runner, session_id, user2)
 
-        # Update memory from agent response (reliable)
         extracted = extract_ticker_from_text(answer)
         if extracted:
             last_ticker = extracted

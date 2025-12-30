@@ -12,11 +12,9 @@ from google.genai import types
 from app.financial_advisor.agent import agent
 from app.financial_advisor.guardrails.input_validation import normalize_user_text, looks_like_prompt_injection
 from app.financial_advisor.guardrails.output_validation import validate_financial_output
+from app.financial_advisor.tools.sheets_context import fetch_sheet_context, needs_sheet_context
 
 
-# -----------------------------
-# Helpers: memory + follow-ups
-# -----------------------------
 def extract_ticker_from_text(text: str) -> Optional[str]:
     if not text:
         return None
@@ -39,11 +37,9 @@ def rewrite_followup(user_text: str, last_ticker: Optional[str]) -> str:
 
     t = (user_text or "").strip().lower()
 
-    # Price follow-ups
     if any(p in t for p in ["its price", "what is its price", "price?", "current price", "how much is it"]) and not user_mentions_ticker(user_text):
         return f"Get the latest quote for {last_ticker} and answer with price, change %, and as_of timestamp."
 
-    # Yesterday follow-ups
     if "yesterday" in t and not user_mentions_ticker(user_text):
         return (
             f"For {last_ticker}: use get_history(symbol='{last_ticker}', days=5) and answer:\n"
@@ -56,13 +52,17 @@ def rewrite_followup(user_text: str, last_ticker: Optional[str]) -> str:
 
 
 async def run_agent_once(runner: Runner, session_id: str, user_text: str) -> str:
-    # Guardrails
     user_text = normalize_user_text(user_text)
     if looks_like_prompt_injection(user_text):
         return (
             "I can’t follow requests that try to override system rules or reveal secrets. "
             "Tell me your investing question (symbol, goal, time horizon), and I’ll help."
         )
+
+    # ✅ Deterministic spreadsheet grounding (when relevant)
+    if needs_sheet_context(user_text):
+        sheet_ctx = await fetch_sheet_context()
+        user_text = f"{sheet_ctx}\nUser question:\n{user_text}"
 
     content = types.Content(role="user", parts=[types.Part(text=user_text)])
 
@@ -80,7 +80,6 @@ async def run_agent_once(runner: Runner, session_id: str, user_text: str) -> str
 
 
 def ensure_runtime():
-    """Create session_id, session service, and runner once per Streamlit session."""
     if "user_id" not in st.session_state:
         st.session_state.user_id = "streamlit-user"
 
@@ -97,7 +96,6 @@ def ensure_runtime():
         st.session_state.session_service = InMemorySessionService()
 
     if "runner" not in st.session_state:
-        # Create ADK session once
         asyncio.run(
             st.session_state.session_service.create_session(
                 app_name="financial-advisor-agent",
@@ -112,55 +110,45 @@ def ensure_runtime():
         )
 
 
-# -----------------------------
-# Streamlit UI
-# -----------------------------
 st.set_page_config(page_title="Financial Advisor Agent", page_icon="📈", layout="wide")
 ensure_runtime()
 
 st.title("📈 Financial Advisor Agent (ADK + MCP + Redis)")
-st.caption("Live market data via MCP (Alpha Vantage). This is not financial advice.")
+st.caption("Spreadsheet grounding via Google Sheets MCP + market data via Alpha Vantage MCP. Not financial advice.")
 
-# Sidebar: status + memory
 with st.sidebar:
     st.header("Session")
     st.write("Session ID:", st.session_state.session_id)
     st.write("Last ticker:", st.session_state.last_ticker or "—")
     st.divider()
     st.subheader("Tips")
-    st.markdown("- Try: **Find ticker for CoreWeave**")
+    st.markdown("- Try: **Summarize my portfolio from the spreadsheet**")
+    st.markdown("- Try: **From my watchlist in sheet, pick top 3 tickers and justify**")
     st.markdown("- Then: **What is its price?**")
-    st.markdown("- Then: **What about yesterday?**")
     st.divider()
     if st.button("Reset chat"):
         st.session_state.messages = []
         st.session_state.last_ticker = None
         st.rerun()
 
-# Render chat history
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# Input
-prompt = st.chat_input("Ask about a stock, portfolio idea, or trend…")
+prompt = st.chat_input("Ask about a stock, portfolio, watchlist, budget…")
 
 if prompt:
-    # Apply follow-up rewrite using memory
     rewritten = rewrite_followup(prompt, st.session_state.last_ticker)
 
-    # Show user message (original)
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Run agent
     with st.chat_message("assistant"):
         with st.spinner("Thinking…"):
             answer = asyncio.run(run_agent_once(st.session_state.runner, st.session_state.session_id, rewritten))
         st.markdown(answer)
 
-    # Update memory (extract ticker from assistant answer)
     new_ticker = extract_ticker_from_text(answer)
     if new_ticker:
         st.session_state.last_ticker = new_ticker
