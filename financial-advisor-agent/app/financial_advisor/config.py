@@ -9,6 +9,10 @@ class Settings(BaseSettings):
 
     # MCP endpoint for Alpha Vantage tools
     MCP_ALPHA_URL: str = "http://localhost:8787/sse"
+    MCP_SHEETS_URL: str = "http://localhost:8790/sse"
+
+    # Default spreadsheet to use when the caller does not provide one explicitly
+    GOOGLE_SHEETS_SPREADSHEET_ID: str = ""
 
     QUOTE_CACHE_TTL_SEC: int = 20
     MAX_HISTORY_DAYS: int = 3650

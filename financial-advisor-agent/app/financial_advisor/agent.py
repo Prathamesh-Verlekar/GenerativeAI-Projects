@@ -5,6 +5,7 @@ from google.adk.models.lite_llm import LiteLlm
 
 from app.financial_advisor.config import settings
 from app.financial_advisor.tools.mcp_alpha_vantage import build_alpha_toolset
+from app.financial_advisor.tools.mcp_google_sheets import build_google_sheets_toolset
 
 # If you already load system.md, keep that logic.
 INSTRUCTION = """You are a cautious financial advisor assistant.
@@ -21,5 +22,5 @@ agent = LlmAgent(
     name="financial_advisor",
     model=build_model(),
     instruction=INSTRUCTION,
-    tools=[build_alpha_toolset()],
+    tools=[build_alpha_toolset(), build_google_sheets_toolset()],
 )
