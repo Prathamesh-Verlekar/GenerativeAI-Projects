@@ -175,6 +175,27 @@ flowchart TD
   - `update_range(range_a1, values, spreadsheet_id?, worksheet_title?)`
 - Default port: **8790** (see `docker-compose.yml`).
 
+### Google Sheets MCP: End-to-End Setup
+
+1. **Create a Google Cloud service account** with the **Google Sheets API** enabled.
+2. **Generate a service account key** (JSON).
+3. **Share your target spreadsheet** with the service account email (usually `<service-account-name>@<project>.iam.gserviceaccount.com`).
+4. **Set environment variables** (example for `.env` or docker-compose overrides):
+   ```env
+   # Required: raw JSON from the downloaded key file
+   GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON='{"type":"service_account","project_id":"...","private_key_id":"...","private_key":"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n","client_email":"<service-account>@<project>.iam.gserviceaccount.com","client_id":"...","token_uri":"https://oauth2.googleapis.com/token"}'
+
+   # Optional: default spreadsheet used when an ID is not passed to tools
+   GOOGLE_SHEETS_SPREADSHEET_ID=1abc2DefGhijklmNoPqRstuVWxyz0123456789
+   ```
+   - If you prefer to keep the key in a file, load it when exporting: `export GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON="$(cat /path/key.json | tr -d '\n')"`.
+5. **Start the server**
+   - Docker Compose (recommended): `docker compose up google-sheets-mcp`
+   - Local dev: `uvicorn mcp_servers.google_sheets_mcp.server:app --port 8790 --host 0.0.0.0`
+6. **Point the agent at the MCP endpoint**
+   - Set `MCP_SHEETS_URL=http://localhost:8790/sse` (or the container hostname when networked via Docker).
+   - With `GOOGLE_SHEETS_SPREADSHEET_ID` set, tool calls only need ranges and values.
+
 ---
 
 ## 🧠 Session Memory
@@ -258,9 +279,14 @@ OPENAI_API_KEY=sk-xxxx
 OPENAI_MODEL=openai/gpt-4.1-mini
 
 MCP_ALPHA_URL=http://localhost:8787/sse
+MCP_SHEETS_URL=http://localhost:8790/sse
 REDIS_URL=redis://redis:6379/0
 QUOTE_CACHE_TTL_SEC=20
 MAX_HISTORY_DAYS=3650
+
+# Google Sheets MCP
+GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON='{"type":"service_account",...}'
+GOOGLE_SHEETS_SPREADSHEET_ID=1abc2DefGhijklmNoPqRstuVWxyz0123456789
 ```
 
 ---
