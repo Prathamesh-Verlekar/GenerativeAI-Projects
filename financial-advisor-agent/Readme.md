@@ -24,11 +24,15 @@ This project demonstrates **production-grade agent architecture** with:
 - Guardrails prevent prompt injection & unsafe financial claims
 
 ### 🔌 MCP-Based Tooling
-- Market data exposed via **Model Context Protocol (MCP)**
+- Market data and spreadsheets exposed via **Model Context Protocol (MCP)**
 - Tools available:
   - `search_ticker`
   - `get_quote`
   - `get_history`
+  - `fetch_values` (Google Sheets)
+  - `list_rows` (Google Sheets)
+  - `append_row` (Google Sheets)
+  - `update_range` (Google Sheets)
 
 ### ⚡ Performance & Caching
 - **Redis-backed caching** for Alpha Vantage API calls
@@ -77,10 +81,14 @@ financial-advisor-agent/
 │           └── mcp_alpha_vantage.py  # MCP toolset wiring
 │
 ├── mcp_servers/
-│   └── alpha_vantage_mcp/
-│       ├── server.py                 # MCP Server (FastMCP + SSE)
-│       ├── alpha_client.py           # Alpha Vantage API client
-│       ├── cache.py                  # Redis cache wrapper
+│   ├── alpha_vantage_mcp/
+│   │   ├── server.py                 # MCP Server (FastMCP + SSE)
+│   │   ├── alpha_client.py           # Alpha Vantage API client
+│   │   ├── cache.py                  # Redis cache wrapper
+│   │   └── Dockerfile
+│   └── google_sheets_mcp/
+│       ├── server.py                 # Google Sheets MCP Server
+│       ├── sheets_client.py          # Service Account client wrapper
 │       └── Dockerfile
 │
 ├── streamlit_app.py                  # Visual chat UI
@@ -154,6 +162,18 @@ flowchart TD
 [MCP] get_quote symbol=AAPL cache=HIT latency_ms=3.1
 [MCP] get_history symbol=AAPL days=5 cache=MISS latency_ms=412.7
 ```
+
+### Google Sheets MCP Setup
+
+- Uses a **service account** for authentication.
+- Required environment variable: `GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON` (the full JSON for the service account).
+- Optional default: `GOOGLE_SHEETS_SPREADSHEET_ID` to avoid repeating the spreadsheet ID in tool calls.
+- Tools exposed:
+  - `fetch_values(range_a1, spreadsheet_id?, worksheet_title?)`
+  - `list_rows(spreadsheet_id?, worksheet_title?, limit=20)`
+  - `append_row(row, spreadsheet_id?, worksheet_title?)`
+  - `update_range(range_a1, values, spreadsheet_id?, worksheet_title?)`
+- Default port: **8790** (see `docker-compose.yml`).
 
 ---
 

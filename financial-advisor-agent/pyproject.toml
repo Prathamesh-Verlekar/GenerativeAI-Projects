@@ -6,6 +6,8 @@ dependencies = [
   "pydantic-settings>=2.0.0",
   "requests>=2.31.0",
   "redis>=5.0.0",
+  "gspread>=6.0.0",
+  "google-auth>=2.29.0",
 
   # MCP SDK package name may vary in your environment
   "mcp",

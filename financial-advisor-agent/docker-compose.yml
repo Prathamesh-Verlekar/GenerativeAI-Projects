@@ -20,3 +20,15 @@ services:
     depends_on:
       - redis
 
+  sheets-mcp:
+    build:
+      context: .
+      dockerfile: mcp_servers/google_sheets_mcp/Dockerfile
+    env_file:
+      - .env
+    environment:
+      GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON: ${GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON}
+      GOOGLE_SHEETS_SPREADSHEET_ID: ${GOOGLE_SHEETS_SPREADSHEET_ID}
+    ports:
+      - "8790:8790"
+
