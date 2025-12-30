@@ -8,6 +8,8 @@ from mcp.server.fastmcp import FastMCP
 from sheets_client import GoogleSheetsClient
 from starlette.applications import Starlette
 from starlette.routing import Mount
+from starlette.responses import JSONResponse, PlainTextResponse
+from starlette.routing import Route, Mount
 import uvicorn
 
 
@@ -19,6 +21,20 @@ DEFAULT_SPREADSHEET_ID = os.getenv("GOOGLE_SHEETS_SPREADSHEET_ID", "").strip() o
 
 client = GoogleSheetsClient(service_account_json=SERVICE_ACCOUNT_JSON)
 mcp = FastMCP(name="google_sheets_manager")
+
+def healthz(request):
+    return JSONResponse({"ok": True, "service": "google-sheets-mcp"})
+
+def root(request):
+    return PlainTextResponse("Google Sheets MCP is running. Use /sse for MCP SSE endpoint.\n")
+
+app = Starlette(
+    routes=[
+        Route("/", root),
+        Route("/healthz", healthz),
+        Mount("/", app=mcp.sse_app()),
+    ]
+)
 
 
 def _ms(t0: float) -> float:
